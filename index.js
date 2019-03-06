@@ -63,11 +63,21 @@ client.on('message', async message => {
             }
             const response = await fetch(`https://www.kickstarter.com/projects/${creator}/${campaign}/stats.json`);
             const stats = await response.json();
-            message.channel.send(`The campaign currently has ${stats.project.backers_count} backers with a total donation amount of $${stats.project.pledged}`);
+            message.channel.send(`The campaign currently has ${stats.project.backers_count} backers with a total donation amount of $${stats.project.pledged}. View more info at https://www.kickstarter.com/projects/${creator}/${campaign}/description.`);
         } catch (err) {
             message.author.send('Uh-oh, that\'s an error...');
         }
     }
 });
+
+client.on('message', async message => {
+    const command = `${PREFIX} link`;
+    if (message.content.startsWith(command)) {
+        const creator = (await pgClient.query('SELECT * FROM settings WHERE guild_id=$1 AND name=$2 LIMIT 1', [message.guild.id, 'creator'])).rows[0].value;
+        const campaign = (await pgClient.query('SELECT * FROM settings WHERE guild_id=$1 AND name=$2 LIMIT 1', [message.guild.id, 'campaign'])).rows[0].value;
+        const link = `https://www.kickstarter.com/projects/${creator}/${campaign}/description`;
+        message.channel.send(`The currently tracked campaign is ${link}`);
+    }
+})
 
 client.login(process.env.BOT_TOKEN);
