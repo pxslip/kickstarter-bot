@@ -33,9 +33,23 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: "BOT_TOKEN"
+              value: {{ .Values.botToken }}
+            - name: "PG_HOST"
+              value: "{{ .Release.Name }}-{{ .Values.global.postgresql.postgresqlHost }}"
+            - name: "PG_USER"
+              value: {{ .Values.global.postgresql.postgresqlUsername }}
+            - name: "PG_PASS"
+              valueFrom:
+                secretKeyRef:
+                  key: pass
+                  name: {{ .Release.Name }}-auth
+            - name: "PG_DATABASE"
+              value: {{ .Values.global.postgresql.postgresqlDatabase }}
           ports:
             - name: http
-              containerPort: 80
+              containerPort: 20080
               protocol: TCP
           livenessProbe:
             httpGet:

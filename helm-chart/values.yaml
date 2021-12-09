@@ -2,11 +2,18 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+global:
+  postgresql:
+    postgresqlDatabase: "ks-bot"
+    postgresqlUsername: "postgres"
+    postgresqlPassword: ""
+    postgresqlHost: "postgresql"
+
 replicaCount: 1
 
 image:
-  repository: pxslip/kickstart-bot
-  pullPolicy: IfNotPresent
+  repository: pxslip/kickstarter-bot
+  pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
   tag: 'latest'
 
@@ -84,3 +91,5 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+botToken: ''
