@@ -8,21 +8,26 @@ import { Server as httpServer } from 'http';
 const client = new Client({
   intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES],
 });
-const pgClient = new pg.Client({
-  host: process.env.PG_HOST,
-  user: process.env.PG_USER,
-  password: process.env.PG_PASS,
-  database: process.env.PG_DATABASE,
-});
+
+const pgClient = new pg.Client();
 
 const PREFIX = '!ksbot';
 const SETTINGS_TABLE = 'settings';
+
+const sendSelfDestructingErrorMessage = async (message) => {
+  const errMsg = await message.channel.send(
+    'There was an issue retrieving the campaig link...this message will self-destruct in 10 seconds'
+  );
+  setTimeout(() => {
+    errMsg.delete();
+  }, 10000);
+};
 
 client.on('ready', async () => {
   try {
     await pgClient.connect();
     const tableExists = await pgClient.query(
-      `SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = '${pgClient.database}' AND table_name = '${SETTINGS_TABLE}')`
+      `SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_catalog = '${pgClient.database}' AND table_name = '${SETTINGS_TABLE}')`
     );
     if (!tableExists.rows[0].exists) {
       await pgClient.query(
@@ -30,45 +35,50 @@ client.on('ready', async () => {
       );
     }
   } catch (err) {
-    console.log(err);
+    throw err;
   }
 });
 
-client.on('message', async (message) => {
-  const command = `${PREFIX} set-campaign`;
-  if (message.content.startsWith(command)) {
-    if (message.member.id === message.guild.ownerID) {
-      const info = message.content.replace(command, '').trim().split(' ');
-      if (info.length === 2) {
-        try {
-          await pgClient.query(
-            'INSERT INTO settings(guild_id, name, value) VALUES($1, $2, $3) RETURNING *',
-            [message.guild.id, 'creator', info[0]]
-          );
-          await pgClient.query(
-            'INSERT INTO settings(guild_id, name, value) VALUES($1, $2, $3) RETURNING *',
-            [message.guild.id, 'campaign', info[1]]
-          );
+client.on('messageCreate', async (message) => {
+  try {
+    const command = `${PREFIX} set-campaign`;
+    if (message.content.startsWith(command)) {
+      if (message.member.id === message.guild.ownerId) {
+        const info = message.content.replace(command, '').trim().split(' ');
+        if (info.length === 2) {
+          try {
+            await pgClient.query(
+              'INSERT INTO settings(guild_id, name, value) VALUES($1, $2, $3) RETURNING *',
+              [message.guild.id, 'creator', info[0]]
+            );
+            await pgClient.query(
+              'INSERT INTO settings(guild_id, name, value) VALUES($1, $2, $3) RETURNING *',
+              [message.guild.id, 'campaign', info[1]]
+            );
+            message.channel.send(
+              `Now tracking ${info[0]}'s ${info[1]} kickstarter. Check it out at https://www.kickstarter.com/projects/${info[0]}/${info[1]}/description`
+            );
+          } catch (err) {
+            message.channel.send(
+              'Uh-oh, that was an error setting the campaign to follow!'
+            );
+          }
+        } else {
           message.channel.send(
-            `Now tracking ${info[0]}'s ${info[1]} kickstarter. Check it out at https://www.kickstarter.com/projects/${info[0]}/${info[1]}/description`
-          );
-        } catch (err) {
-          message.channel.send(
-            'Uh-oh, that was an error setting the campaign to follow!'
+            'The command signature is `!ksbot set-campaign [creator-slug] [campaign-slug]` e.g. !ksbot set-campaign criticalrole critical-role-the-legend-of-vox-machina-animated-s'
           );
         }
       } else {
-        message.channel.send(
-          'The command signature is `!ksbot set-campaign [creator-slug] [campaign-slug]` e.g. !ksbot set-campaign criticalrole critical-role-the-legend-of-vox-machina-animated-s'
-        );
+        message.channel.send('Only the server owner can use this command');
       }
-    } else {
-      message.channel.send('Only the server owner can use this command');
     }
+  } catch (exc) {
+    sendSelfDestructingErrorMessage(message);
+    console.error(exc);
   }
 });
 
-client.on('message', async (message) => {
+client.on('messageCreate', async (message) => {
   const command = `${PREFIX} status`;
   if (message.content.startsWith(command)) {
     try {
@@ -105,28 +115,32 @@ client.on('message', async (message) => {
         `The campaign currently has ${stats.project.backers_count} backers with a total donation amount of $${stats.project.pledged}. View more info at https://www.kickstarter.com/projects/${creator}/${campaign}/description.`
       );
     } catch (err) {
-      message.author.send("Uh-oh, that's an error...");
+      sendSelfDestructingErrorMessage(message);
+      console.error(err);
     }
   }
 });
 
-client.on('message', async (message) => {
-  const command = `${PREFIX} link`;
-  if (message.content.startsWith(command)) {
-    const creator = (
-      await pgClient.query(
+client.on('messageCreate', async (message) => {
+  try {
+    const command = `${PREFIX} link`;
+    if (message.content.startsWith(command)) {
+      const creatorResp = await pgClient.query(
         'SELECT * FROM settings WHERE guild_id=$1 AND name=$2 LIMIT 1',
         [message.guild.id, 'creator']
-      )
-    ).rows[0].value;
-    const campaign = (
-      await pgClient.query(
+      );
+      const creator = creatorResp.rows[0].value;
+      const campaignResp = await pgClient.query(
         'SELECT * FROM settings WHERE guild_id=$1 AND name=$2 LIMIT 1',
         [message.guild.id, 'campaign']
-      )
-    ).rows[0].value;
-    const link = `https://www.kickstarter.com/projects/${creator}/${campaign}/description`;
-    message.channel.send(`The currently tracked campaign is ${link}`);
+      );
+      const campaign = campaignResp.rows[0].value;
+      const link = `https://www.kickstarter.com/projects/${creator}/${campaign}/description`;
+      message.channel.send(`The currently tracked campaign is ${link}`);
+    }
+  } catch (exc) {
+    sendSelfDestructingErrorMessage(message);
+    console.error(exc);
   }
 });
 
