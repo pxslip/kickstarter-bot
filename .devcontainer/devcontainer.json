@@ -26,7 +26,7 @@
   // Use 'postCreateCommand' to run commands after the container is created.
   "postCreateCommand": "npm install",
   "mounts": [
-    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.kube,target=${containerEnv:HOME}/.kube,type=bind,consistency=cached"
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.kube,target=/home/node/.kube,type=bind,consistency=cached"
   ],
 
   // Comment out connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
