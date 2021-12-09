@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "A bot that will send updates about a kickstarter campaign to your users",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js"
