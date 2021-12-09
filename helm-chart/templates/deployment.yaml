@@ -27,6 +27,10 @@ spec:
       serviceAccountName: {{ include "helm-chart.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: init-database
+          image: busybox:1.28
+          command: ['sh', '-c', "until nslookup {{ .Release.Name }}-{{ .Values.global.postgresql.postgresqlHost }}; do echo waiting for mydb; sleep 2; done"]
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
@@ -36,17 +40,19 @@ spec:
           env:
             - name: "BOT_TOKEN"
               value: {{ .Values.botToken }}
-            - name: "PG_HOST"
+            - name: "PGHOST"
               value: "{{ .Release.Name }}-{{ .Values.global.postgresql.postgresqlHost }}"
-            - name: "PG_USER"
+            - name: "PGUSER"
               value: {{ .Values.global.postgresql.postgresqlUsername }}
-            - name: "PG_PASS"
+            - name: "PGPASSWORD"
               valueFrom:
                 secretKeyRef:
                   key: pass
                   name: {{ .Release.Name }}-auth
-            - name: "PG_DATABASE"
+            - name: "PGDATABASE"
               value: {{ .Values.global.postgresql.postgresqlDatabase }}
+            - name: "PGPORT"
+              value: {{ .Values.global.postgresql.servicePort | default 5432 | quote }}
           ports:
             - name: http
               containerPort: 20080
